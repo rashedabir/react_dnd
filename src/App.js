@@ -1,81 +1,83 @@
 /* eslint-disable no-useless-computed-key */
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { DragDropContext, Draggable, Droppable } from "react-beautiful-dnd";
+import { useDispatch } from "react-redux";
+import { useSelector } from "react-redux";
 import { v4 as uuidv4 } from "uuid";
-
-const _init = {
-  ["todo_list"]: {
-    name: "To do",
-    items: [],
-  },
-  ["progress_list"]: {
-    name: "In Progress",
-    items: [],
-  },
-  ["done_list"]: {
-    name: "Done",
-    items: [],
-  },
-};
-
-const onDragEnd = (result, columns, setColumns) => {
-  if (!result.destination) return;
-  const { source, destination } = result;
-
-  if (source.droppableId !== destination.droppableId) {
-    const sourceColumn = columns[source.droppableId];
-    const destColumn = columns[destination.droppableId];
-    const sourceItems = [...sourceColumn.items];
-    const destItems = [...destColumn.items];
-    const [removed] = sourceItems.splice(source.index, 1);
-    destItems.splice(destination.index, 0, removed);
-    setColumns({
-      ...columns,
-      [source.droppableId]: {
-        ...sourceColumn,
-        items: sourceItems,
-      },
-      [destination.droppableId]: {
-        ...destColumn,
-        items: destItems,
-      },
-    });
-  } else {
-    const column = columns[source.droppableId];
-    const copiedItems = [...column.items];
-    const [removed] = copiedItems.splice(source.index, 1);
-    copiedItems.splice(destination.index, 0, removed);
-    setColumns({
-      ...columns,
-      [source.droppableId]: {
-        ...column,
-        items: copiedItems,
-      },
-    });
-  }
-};
+import * as action from "./_redux/todos/todoAction";
 
 function App() {
-  const [columns, setColumns] = useState(_init);
+  const dispatch = useDispatch();
+  const { columns } = useSelector((state) => state.todos);
   const [value, setValue] = useState("");
 
+  const onDragEnd = (result, columns) => {
+    if (!result.destination) return;
+    const { source, destination } = result;
+
+    if (source.droppableId !== destination.droppableId) {
+      const sourceColumn = columns[source.droppableId];
+      const destColumn = columns[destination.droppableId];
+      const sourceItems = [...sourceColumn.items];
+      const destItems = [...destColumn.items];
+      const [removed] = sourceItems.splice(source.index, 1);
+      destItems.splice(destination.index, 0, removed);
+      const data = {
+        ...columns,
+        [source.droppableId]: {
+          ...sourceColumn,
+          items: sourceItems,
+        },
+        [destination.droppableId]: {
+          ...destColumn,
+          items: destItems,
+        },
+      };
+      dispatch(action.storeToTodo(data));
+    } else {
+      const column = columns[source.droppableId];
+      const copiedItems = [...column.items];
+      const [removed] = copiedItems.splice(source.index, 1);
+      copiedItems.splice(destination.index, 0, removed);
+      const data = {
+        ...columns,
+        [source.droppableId]: {
+          ...column,
+          items: copiedItems,
+        },
+      };
+      dispatch(action.storeToTodo(data));
+    }
+  };
+
   const handleAdd = () => {
-    setColumns((prev) => ({
+    const prev = { ...columns };
+    const data = {
       ...prev,
       todo_list: {
         name: prev.todo_list.name,
         items: [...prev.todo_list.items, { id: uuidv4(), content: value }],
       },
-    }));
-
+    };
+    dispatch(action.storeToTodo(data));
     setValue("");
   };
+
+  useEffect(() => {
+    const data =
+      localStorage.getItem("TODO") && JSON.parse(localStorage.getItem("TODO"));
+
+    if (data && Object.keys(data).length > 0) {
+      dispatch(action.storeToTodo(data));
+    }
+  }, [dispatch]);
 
   return (
     <div>
       <div
         style={{
           display: "flex",
+          gap: "10px",
           justifyContent: "center",
           height: "100%",
           margin: "50px 0 20px 0",
@@ -84,14 +86,14 @@ function App() {
         <input
           style={{ width: "300px", height: "30px", padding: "5px" }}
           value={value}
-          placeholder="write todo"
+          placeholder="Write your task ..."
           onChange={(e) => {
             setValue(e.target.value);
           }}
         />
         <button
           onClick={handleAdd}
-          style={{ background: "#ff6347", color: "#fff", fontSize: "20px" }}
+          style={{ background: "#fff", color: "#ff6347", fontSize: "20px" }}
         >
           Add
         </button>
@@ -105,9 +107,7 @@ function App() {
           height: "100%",
         }}
       >
-        <DragDropContext
-          onDragEnd={(result) => onDragEnd(result, columns, setColumns)}
-        >
+        <DragDropContext onDragEnd={(result) => onDragEnd(result, columns)}>
           {Object.entries(columns).map(([columnId, column], index) => {
             return (
               <div
